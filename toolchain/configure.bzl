@@ -14,16 +14,22 @@
 
 # If a new LLVM version is missing from this list, please add the shasum here
 # and send a PR on github.
-_llvm_sha256_linux = {
-    "6.0.0": "cc99fda45b4c740f35d0a367985a2bf55491065a501e2dd5d1ad3f97dcac89da",
-}
-
-_llvm_sha256_darwin = {
-    "6.0.0": "0ef8e99e9c9b262a53ab8f2821e2391d041615dd3f3ff36fdf5370916b0f4268",
+_llvm_sha256 = {
+    "6.0.0": {
+      "linux-gnu-ubuntu-16.04": "cc99fda45b4c740f35d0a367985a2bf55491065a501e2dd5d1ad3f97dcac89da",
+      "linux-gnu-ubuntu-14.04": "114e78b2f6db61aaee314c572e07b0d635f653adc5d31bd1cd0bf31a3db4a6e5",
+      "apple-darwin":           "0ef8e99e9c9b262a53ab8f2821e2391d041615dd3f3ff36fdf5370916b0f4268",
+    },
+    "5.0.2": {
+      "linux-gnu-ubuntu-16.04": "15a97aa654b529793da7d115bcfdd8b93281d94f86ec98f0850aff7cf82cbb3f",
+      "linux-gnu-ubuntu-14.04": "461548a2808ad8c1c8162147853e398a8e0c5438fe7d24f2b657055ae5764812",
+      "apple-darwin":           "aa535704246f1cc55ec67b2b0579112c4bb1049c991a4bb0e1da7009bb1b832e",
+    }
 }
 
 def _download_llvm_preconfigured(rctx):
   llvm_version = rctx.attr.llvm_version
+  platform = rctx.attr.platform
 
   url_base = []
   if rctx.attr.llvm_mirror:
@@ -31,14 +37,16 @@ def _download_llvm_preconfigured(rctx):
   url_base += ["https://releases.llvm.org"]
 
   if rctx.os.name == "linux":
-    prefix = "clang+llvm-{0}-x86_64-linux-gnu-ubuntu-16.04".format(llvm_version)
-    sha256 = _llvm_sha256_linux[llvm_version]
+    if not platform:
+      platform = "linux-gnu-ubuntu-16.04"
   elif rctx.os.name == "mac os x":
-    prefix = "clang+llvm-{0}-x86_64-apple-darwin".format(llvm_version)
-    sha256 = _llvm_sha256_darwin[llvm_version]
+    if not platform:
+      platform = "apple-darwin"
   else:
     fail("Unsupported OS: " + rctx.os.name)
 
+  sha256 = _llvm_sha256[llvm_version][platform]
+  prefix = "clang+llvm-{0}-x86_64-{1}".format(llvm_version, platform)
   urls = [(base + "/{0}/{1}.tar.xz".format(llvm_version, prefix)).replace("+", "%2B")
           for base in url_base]
 
@@ -114,7 +122,11 @@ llvm_toolchain = repository_rule(
             doc = "One of the supported versions of LLVM.",
         ),
         "llvm_mirror": attr.string(
+            default = "",
             doc = "Mirror base for LLVM binaries if using the pre-configured URLs.",
+        ),
+        "platform": attr.string(
+            doc = "Target platform (one of listed on http://releases.llvm.org/download.html#svn)."
         ),
         "urls": attr.string_list_dict(
             mandatory = False,
